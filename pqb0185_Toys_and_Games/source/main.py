@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import pickle
 import matplotlib.pyplot as plt
+import multiprocessing
 
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
@@ -11,6 +12,8 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.neural_network import MLPClassifier
+
+from evolutionary_search import EvolutionaryAlgorithmSearchCV # needs scikit-learn <= 1.0.2
 
 ### Helper Functions ###
 def nlp(review_list):
@@ -248,15 +251,19 @@ def grid_search(X, Y):
     #             'estimator__max_depth': [5],
     #             'learning_rate': [2.0725, 2.075, 2.0775]
     #             }
-    nn_params = { 'hidden_layer_sizes': [(100, 100, 100, 100), (100, 100, 100, 100, 100)],
-                'activation': ['relu', 'tanh', 'logistic'],
-                'solver': ['adam', 'sgd'],
-                'learning_rate': ['constant', 'adaptive'],
-                'learning_rate_init': [0.01, 0.025, 0.05]
+    nn_params = {#'hidden_layer_sizes': [(100, 100, 100, 100), (100, 100, 100, 100, 100)],
+                #'activation': ['relu', 'tanh', 'logistic'],
+                #'solver': ['adam', 'sgd'],
+                #'learning_rate': ['constant', 'adaptive'],
+                'learning_rate_init': [0.01, 0.02, 0.025, 0.03, 0.05]
                 }
 
     # ab_grid = GridSearchCV(model_ab, ab_params, cv=10, scoring="f1", verbose=2, n_jobs=-1)
-    nn_grid = GridSearchCV(model_nn, nn_params, cv=10, scoring="f1", verbose=2, n_jobs=-1)
+    # nn_grid = GridSearchCV(model_nn, nn_params, cv=10, scoring="f1", verbose=2, n_jobs=-1)
+
+    # Evolutionary Search:
+    pool = multiprocessing.Pool(4)
+    nn_grid = EvolutionaryAlgorithmSearchCV(estimator=model_nn,params=nn_params, scoring='f1',cv=10, verbose=True, population_size=50, gene_mutation_prob=0.10, gene_crossover_prob=0.5, tournament_size=3, generations_number=20, n_jobs=3)
 
     #ab_grid.fit(X, Y)
     nn_grid.fit(X, Y)
@@ -293,9 +300,9 @@ def main():
     nn_best_params = grid_search(X, Y)
     #nn_best_params = {'activation': 'tanh', 'hidden_layer_sizes': (10, 10, 10, 10), 'learning_rate': 'constant', 'learning_rate_init': 0.05, 'solver': 'sgd'}
     ### Boosting ###
-    model_ab = AdaBoostClassifier(
-        RandomForestClassifier(max_depth=5, n_estimators=100, n_jobs=-1, criterion="log_loss", class_weight=None),
-        n_estimators=13, learning_rate=2.075)
+    # model_ab = AdaBoostClassifier(
+    #     RandomForestClassifier(max_depth=5, n_estimators=100, n_jobs=-1, criterion="log_loss", class_weight=None),
+    #     n_estimators=13, learning_rate=2.075)
     model_nn = MLPClassifier(**nn_best_params)
 
     models = [value for name, value in locals().items() if name.startswith('model_')]
@@ -349,4 +356,5 @@ def main():
 
 
 if __name__ == '__main__':
+    multiprocessing.freeze_support()
     main()
