@@ -1,0 +1,6 @@
+,model_ab,model_nn
+recall,0.8935,0.8045
+precision,0.6742,0.7118
+f1,0.7685,0.7552
+roc_auc,0.7798,0.7738
+accuracy,0.7056,0.7148

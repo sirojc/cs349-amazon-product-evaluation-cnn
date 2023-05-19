@@ -10,6 +10,7 @@ from sklearn.model_selection import cross_validate
 from sklearn.model_selection import GridSearchCV
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
+from sklearn.neural_network import MLPClassifier
 
 ### Helper Functions ###
 def nlp(review_list):
@@ -240,22 +241,33 @@ def generate_feature_vectors():
 
 def grid_search(X, Y):
     print("Performing Grid Search")
-    model_ab = AdaBoostClassifier(RandomForestClassifier(max_depth=8, n_estimators=100, n_jobs=-1, criterion="log_loss", class_weight=None))
+    # model_ab = AdaBoostClassifier(RandomForestClassifier(max_depth=8, n_estimators=100, n_jobs=-1, criterion="log_loss", class_weight=None))
+    model_nn = MLPClassifier(max_iter=2000)
 
-    ab_params = {'n_estimators': [13],
-                'estimator__max_depth': [5],
-                'learning_rate': [2.0725, 2.075, 2.0775]
+    # ab_params = {'n_estimators': [13],
+    #             'estimator__max_depth': [5],
+    #             'learning_rate': [2.0725, 2.075, 2.0775]
+    #             }
+    nn_params = { 'hidden_layer_sizes': [(100, 100, 100, 100), (100, 100, 100, 100, 100)],
+                'activation': ['relu', 'tanh', 'logistic'],
+                'solver': ['adam', 'sgd'],
+                'learning_rate': ['constant', 'adaptive'],
+                'learning_rate_init': [0.01, 0.025, 0.05]
                 }
 
-    ab_grid = GridSearchCV(model_ab, ab_params, cv=10, scoring="f1", verbose=2, n_jobs=-1)
+    # ab_grid = GridSearchCV(model_ab, ab_params, cv=10, scoring="f1", verbose=2, n_jobs=-1)
+    nn_grid = GridSearchCV(model_nn, nn_params, cv=10, scoring="f1", verbose=2, n_jobs=-1)
 
-    ab_grid.fit(X, Y)
+    #ab_grid.fit(X, Y)
+    nn_grid.fit(X, Y)
 
-    ab_best_params = ab_grid.best_params_
+    # ab_best_params = ab_grid.best_params_
+    nn_best_params = nn_grid.best_params_
 
-    print("AdaBoost best parameters: ", ab_best_params)
+    # print("AdaBoost best parameters: ", ab_best_params)
+    print("Neural Network best parameters: ", nn_best_params)
 
-    return ab_best_params
+    return nn_best_params
 
 ### Main ###
 def main():
@@ -278,12 +290,13 @@ def main():
     X = scaler.transform(X)
 
     # Perform Grid Search
-    # ab_best_params = grid_search(X, Y)
-
+    nn_best_params = grid_search(X, Y)
+    #nn_best_params = {'activation': 'tanh', 'hidden_layer_sizes': (10, 10, 10, 10), 'learning_rate': 'constant', 'learning_rate_init': 0.05, 'solver': 'sgd'}
     ### Boosting ###
     model_ab = AdaBoostClassifier(
         RandomForestClassifier(max_depth=5, n_estimators=100, n_jobs=-1, criterion="log_loss", class_weight=None),
         n_estimators=13, learning_rate=2.075)
+    model_nn = MLPClassifier(**nn_best_params)
 
     models = [value for name, value in locals().items() if name.startswith('model_')]
     model_names = [name for name, value in locals().items() if name.startswith('model_')]
