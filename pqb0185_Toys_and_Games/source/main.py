@@ -12,6 +12,9 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.neural_network import MLPClassifier
 
+from sklearn_genetic import GASearchCV
+from sklearn_genetic.space import Integer, Categorical, Continuous
+
 ### Helper Functions ###
 def nlp(review_list):
     analyzer = SentimentIntensityAnalyzer()
@@ -248,15 +251,23 @@ def grid_search(X, Y):
     #             'estimator__max_depth': [5],
     #             'learning_rate': [2.0725, 2.075, 2.0775]
     #             }
-    nn_params = { 'hidden_layer_sizes': [(100, 100, 100, 100), (100, 100, 100, 100, 100)],
-                'activation': ['relu', 'tanh', 'logistic'],
-                'solver': ['adam', 'sgd'],
-                'learning_rate': ['constant', 'adaptive'],
-                'learning_rate_init': [0.01, 0.025, 0.05]
+    # nn_params = {'hidden_layer_sizes': [(100, 100, 100, 100), (100, 100, 100, 100, 100)],
+    #             'activation': ['relu', 'tanh', 'logistic'],
+    #             'solver': ['adam', 'sgd'],
+    #             'learning_rate': ['constant', 'adaptive'],
+    #             'learning_rate_init': [0.01, 0.025, 0.05]
+    #             }
+    nn_params = {'tol': Continuous(1e-2, 1e5, distribution='log-uniform'),
+                'alpha': Continuous(1e-5, 2e-5),
+                'activation': Categorical(['relu', 'tanh', 'logistic']),
+                'solver': Categorical(['adam', 'sgd']),
+                'learning_rate': Categorical(['constant', 'adaptive']),
+                #batch_size, learning_rate_init, beta_1, beta_2,...
                 }
 
     # ab_grid = GridSearchCV(model_ab, ab_params, cv=10, scoring="f1", verbose=2, n_jobs=-1)
-    nn_grid = GridSearchCV(model_nn, nn_params, cv=10, scoring="f1", verbose=2, n_jobs=-1)
+    #nn_grid = GridSearchCV(model_nn, nn_params, cv=10, scoring="f1", verbose=2, n_jobs=-1)
+    nn_grid = GASearchCV(estimator=model_nn, param_grid=nn_params, cv=10, scoring="f1", verbose=True, n_jobs=-1, population_size=10, generations=20)
 
     #ab_grid.fit(X, Y)
     nn_grid.fit(X, Y)
