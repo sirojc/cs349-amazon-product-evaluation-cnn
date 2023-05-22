@@ -12,6 +12,9 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.neural_network import MLPClassifier
 
+from sklearn_genetic import GASearchCV
+from sklearn_genetic.space import Integer, Categorical, Continuous
+
 ### Helper Functions ###
 def nlp(review_list):
     analyzer = SentimentIntensityAnalyzer()
@@ -126,7 +129,7 @@ def preprocess(associations, prod_training, rev_training):
                 summ_list.append(rev_training.summary[index])
         product_text_list.append(text_list)
         product_summ_list.append(summ_list)
-        feature_stars_list.append(round(np.mean(stars_list), 1) if stars_list != [] else 1)
+        feature_stars_list.append(round(np.mean(stars_list), 1) if stars_list != [] else 3) # change to avg 3 stars if no rating
 
     # NLP
     product_compound_text_list = []
@@ -230,13 +233,13 @@ def generate_feature_vectors():
     awesomeness = add_awesomeness(associations_training, features_training, awesomeness_training)
     
     df_training = pd.DataFrame(awesomeness, index=list(associations_training.keys()))
-    df_training.to_json("./features_training.json")
+    df_training.to_json("./features/features_training.json")
     
     print("Preprocessing test")
     features_test = preprocess(associations_test, asin_test, reviews_test)
 
     df_test = pd.DataFrame(features_test, index=list(associations_test.keys()))
-    df_test.to_json("./features_test3.json")
+    df_test.to_json("./features/features_test3.json")
 
 
 def grid_search(X, Y):
@@ -248,15 +251,26 @@ def grid_search(X, Y):
     #             'estimator__max_depth': [5],
     #             'learning_rate': [2.0725, 2.075, 2.0775]
     #             }
-    nn_params = { 'hidden_layer_sizes': [(100, 100, 100, 100), (100, 100, 100, 100, 100)],
-                'activation': ['relu', 'tanh', 'logistic'],
-                'solver': ['adam', 'sgd'],
-                'learning_rate': ['constant', 'adaptive'],
-                'learning_rate_init': [0.01, 0.025, 0.05]
+    # nn_params = {'hidden_layer_sizes': [(100, 100, 100, 100), (100, 100, 100, 100, 100)],
+    #             'activation': ['relu', 'tanh', 'logistic'],
+    #             'solver': ['adam', 'sgd'],
+    #             'learning_rate': ['constant', 'adaptive'],
+    #             'learning_rate_init': [0.01, 0.025, 0.05]
+    #             }
+    nn_params = {'tol': Continuous(1e-4, 1e-1, distribution='log-uniform'),
+                'hidden_layer_sizes': Categorical([ (100, 100), (10, 10, 10), (100, 100, 100), (10, 10, 10, 10), (100, 100, 100, 100)]),
+                'alpha': Continuous(1e-5, 3e-5),
+                'activation': Categorical(['relu', 'tanh', 'logistic']),
+                'solver': Categorical(['adam', 'sgd']),
+                'learning_rate': Categorical(['constant', 'adaptive']),
+                'learning_rate_init': Continuous(1e-3, 1e-1),
+                'shuffle': Categorical([True, False])
+                #batch_size, beta_1, beta_2,...
                 }
 
     # ab_grid = GridSearchCV(model_ab, ab_params, cv=10, scoring="f1", verbose=2, n_jobs=-1)
-    nn_grid = GridSearchCV(model_nn, nn_params, cv=10, scoring="f1", verbose=2, n_jobs=-1)
+    #nn_grid = GridSearchCV(model_nn, nn_params, cv=10, scoring="f1", verbose=2, n_jobs=-1)
+    nn_grid = GASearchCV(estimator=model_nn, param_grid=nn_params, cv=10, scoring="f1", verbose=True, n_jobs=-1, population_size=30, generations=40)
 
     #ab_grid.fit(X, Y)
     nn_grid.fit(X, Y)
@@ -272,13 +286,13 @@ def grid_search(X, Y):
 ### Main ###
 def main():
     # Preprocessing - uncomment if needed
-    # generate_feature_vectors()
+    generate_feature_vectors()
 
     ### Training ###
     # Read feature vectors from file if already preprocessed
     print("Reading feature vectors from file")
-    features_training = pd.read_json("features_training.json")
-    features_test = pd.read_json("features_test3.json")
+    features_training = pd.read_json("features/features_training.json")
+    features_test = pd.read_json("features/features_test3.json")
 
     feature_cols = ['avg_compound_text', 'avg_compound_summ', 'std_text', 'std_summ', 'pct_verif', 'amt_reviews',
                     'amt_stars']
@@ -291,7 +305,8 @@ def main():
 
     # Perform Grid Search
     nn_best_params = grid_search(X, Y)
-    #nn_best_params = {'activation': 'tanh', 'hidden_layer_sizes': (10, 10, 10, 10), 'learning_rate': 'constant', 'learning_rate_init': 0.05, 'solver': 'sgd'}
+    # nn_best_params = {'activation': 'tanh', 'hidden_layer_sizes': (10, 10, 10, 10), 'learning_rate': 'constant', 'learning_rate_init': 0.05, 'solver': 'sgd'}
+    # nn_best_params = {'tol': 0.008330546988037554, 'hidden_layer_sizes': (100, 100, 100, 100), 'alpha': 1.176332001397507e-05, 'activation': 'relu', 'solver': 'sgd', 'learning_rate': 'constant', 'learning_rate_init': 0.1187653569983233, 'shuffle': True}
     ### Boosting ###
     model_ab = AdaBoostClassifier(
         RandomForestClassifier(max_depth=5, n_estimators=100, n_jobs=-1, criterion="log_loss", class_weight=None),
@@ -328,9 +343,10 @@ def main():
 
     ### Read models if dumped ###
     print("Reading dumped model from file")
-    model_ab = pickle.load(open("./models/model_ab.pkl", "rb"))
+    # model_ab = pickle.load(open("./models/model_ab.pkl", "rb"))
+    model_nn = pickle.load(open("./models/model_nn.pkl", "rb"))
 
-    final_model = model_ab
+    final_model = model_nn
 
     ### Predictions ###
     print("Running predictions")
