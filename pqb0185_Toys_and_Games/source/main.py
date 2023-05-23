@@ -49,6 +49,8 @@ def generate_bar_plot(models, model_names, scoring_method, scores_avg, w=0.2, bo
     plt.savefig("./plots/bar_plot.png")
     # plt.show()
 
+### Hyperparameter Optimization ###
+
 def grid_search(X, Y):
     print("Performing Grid Search")
     # model_ab = AdaBoostClassifier(RandomForestClassifier(max_depth=8, n_estimators=100, n_jobs=-1, criterion="log_loss", class_weight=None))
@@ -58,27 +60,16 @@ def grid_search(X, Y):
     #             'estimator__max_depth': [5],
     #             'learning_rate': [2.0725, 2.075, 2.0775]
     #             }
-    # nn_params = {'hidden_layer_sizes': [(100, 100, 100, 100), (100, 100, 100, 100, 100)],
-    #             'activation': ['relu', 'tanh', 'logistic'],
-    #             'solver': ['adam', 'sgd'],
-    #             'learning_rate': ['constant', 'adaptive'],
-    #             'learning_rate_init': [0.01, 0.025, 0.05]
-    #             }
-    nn_params = {'tol': Continuous(1e-4, 1e-1, distribution='log-uniform'),
-                'hidden_layer_sizes': Categorical([ (100, 100), (10, 10, 10), (100, 100, 100), (10, 10, 10, 10), (100, 100, 100, 100)]),
-                'alpha': Continuous(1e-5, 3e-5),
-                'activation': Categorical(['relu', 'tanh', 'logistic']),
-                'solver': Categorical(['adam', 'sgd']),
-                'learning_rate': Categorical(['constant', 'adaptive']),
-                'learning_rate_init': Continuous(1e-3, 1e-1),
-                'shuffle': Categorical([True, False])
-                #batch_size, beta_1, beta_2,...
+    nn_params = {'hidden_layer_sizes': [(100, 100, 100, 100), (100, 100, 100, 100, 100)],
+                'activation': ['relu', 'tanh', 'logistic'],
+                'solver': ['adam', 'sgd'],
+                'learning_rate': ['constant', 'adaptive'],
+                'learning_rate_init': [0.01, 0.025, 0.05]
                 }
 
     # ab_grid = GridSearchCV(model_ab, ab_params, cv=10, scoring="f1", verbose=2, n_jobs=-1)
-    #nn_grid = GridSearchCV(model_nn, nn_params, cv=10, scoring="f1", verbose=2, n_jobs=-1)
-    nn_grid = GASearchCV(estimator=model_nn, param_grid=nn_params, cv=10, scoring="f1", verbose=True, n_jobs=-1, population_size=30, generations=40)
-
+    nn_grid = GridSearchCV(model_nn, nn_params, cv=10, scoring="f1", verbose=2, n_jobs=-1)
+    
     #ab_grid.fit(X, Y)
     nn_grid.fit(X, Y)
 
@@ -90,7 +81,31 @@ def grid_search(X, Y):
 
     return nn_best_params
 
+def evolutionary_search(X, Y):
+    print("Performing Evolutionary Search")
+    model_nn = MLPClassifier(max_iter=2000)
+
+    nn_params = {'tol': Continuous(1e-4, 1e-1, distribution='log-uniform'),
+            'hidden_layer_sizes': Categorical([ (100, 100), (10, 10, 10), (100, 100, 100), (10, 10, 10, 10), (100, 100, 100, 100)]),
+            'alpha': Continuous(1e-5, 3e-5),
+            'activation': Categorical(['relu', 'tanh', 'logistic']),
+            'solver': Categorical(['adam', 'sgd']),
+            'learning_rate': Categorical(['constant', 'adaptive']),
+            'learning_rate_init': Continuous(1e-3, 1e-1),
+            'shuffle': Categorical([True, False])
+            #batch_size, beta_1, beta_2,...
+            }
+    
+    nn_grid = GASearchCV(estimator=model_nn, param_grid=nn_params, cv=10, scoring="f1", verbose=True, n_jobs=-1, population_size=20, generations=40)
+    nn_grid.fit(X, Y)
+    nn_best_params = nn_grid.best_params_
+    print("Evolutionary Search Neural Network best parameters: ", nn_best_params)
+
+    return nn_best_params
+
+
 ### Main ###
+
 def main():
 
     ### Training ###
@@ -108,10 +123,13 @@ def main():
     scaler = MinMaxScaler(feature_range=(-1, 1)).fit(X)
     X = scaler.transform(X)
 
-    # Perform Grid Search
+    # Perform Hyperparameter Optimization
     # nn_best_params = grid_search(X, Y)
+    nn_best_params = evolutionary_search(X, Y)
+
     # nn_best_params = {'activation': 'tanh', 'hidden_layer_sizes': (10, 10, 10, 10), 'learning_rate': 'constant', 'learning_rate_init': 0.05, 'solver': 'sgd'}
-    nn_best_params = {'tol': 0.008330546988037554, 'hidden_layer_sizes': (100, 100, 100, 100), 'alpha': 1.176332001397507e-05, 'activation': 'relu', 'solver': 'sgd', 'learning_rate': 'constant', 'learning_rate_init': 0.1187653569983233, 'shuffle': True}
+    # nn_best_params = {'tol': 0.008330546988037554, 'hidden_layer_sizes': (100, 100, 100, 100), 'alpha': 1.176332001397507e-05, 'activation': 'relu', 'solver': 'sgd', 'learning_rate': 'constant', 'learning_rate_init': 0.1187653569983233, 'shuffle': True}
+    
     ### Boosting ###
     model_ab = AdaBoostClassifier(
         RandomForestClassifier(max_depth=5, n_estimators=100, n_jobs=-1, criterion="log_loss", class_weight=None),
