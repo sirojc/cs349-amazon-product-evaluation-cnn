@@ -9,6 +9,7 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.neural_network import MLPClassifier
+from sklearn.decomposition import PCA
 
 from sklearn_genetic import GASearchCV
 from sklearn_genetic.space import Integer, Categorical, Continuous
@@ -96,7 +97,7 @@ def evolutionary_search(X, Y):
             #batch_size, beta_1, beta_2,...
             }
     
-    nn_grid = GASearchCV(estimator=model_nn, param_grid=nn_params, cv=10, scoring="f1", verbose=True, n_jobs=-1, population_size=20, generations=40)
+    nn_grid = GASearchCV(estimator=model_nn, param_grid=nn_params, cv=10, scoring="f1", verbose=True, n_jobs=-1, population_size=20, generations=20)
     nn_grid.fit(X, Y)
     nn_best_params = nn_grid.best_params_
     print("Evolutionary Search Neural Network best parameters: ", nn_best_params)
@@ -114,14 +115,18 @@ def main():
     features_training = pd.read_json("features/features_training.json")
     features_test = pd.read_json("features/features_test3.json")
 
-    feature_cols = ['avg_compound_text', 'avg_compound_summ', 'std_text', 'std_summ', 'pct_verif', 'amt_reviews',
-                    'amt_stars']
+    feature_cols = ['avg_compound_text', 'avg_compound_summ', 'pos_text', 'avg_pos_text', 'pos_summ', 'avg_pos_summ', 'neg_text', 'avg_neg_text',
+            'neg_summ', 'avg_neg_summ', 'std_text', 'std_summ', 'pct_verif', 'amt_reviews', 'amt_stars', 'starsabove4', 'product_age']
     X = features_training[feature_cols]
     Y = features_training.awesomeness
 
     # Scaling
     scaler = MinMaxScaler(feature_range=(-1, 1)).fit(X)
     X = scaler.transform(X)
+    
+    # PCA
+    pca = PCA(n_components=12) # usually: improved model performance at cost of accuracy
+    X = pca.fit_transform(X)
 
     # Perform Hyperparameter Optimization
     # nn_best_params = grid_search(X, Y)
@@ -165,26 +170,27 @@ def main():
     scores_avg_df.to_csv("./scores/scores_avg.csv")
 
     ### Read models if dumped ###
-    print("Reading dumped model from file")
-    # model_ab = pickle.load(open("./models/model_ab.pkl", "rb"))
-    model_nn = pickle.load(open("./models/model_nn.pkl", "rb"))
+    # print("Reading dumped model from file")
+    # # model_ab = pickle.load(open("./models/model_ab.pkl", "rb"))
+    # model_nn = pickle.load(open("./models/model_nn.pkl", "rb"))
 
-    final_model = model_nn
+    # final_model = model_nn
 
-    ### Predictions ###
-    print("Running predictions")
-    X_test = features_test[feature_cols]
-    X_test = scaler.transform(X_test)
+    # ### Predictions ###
+    # print("Running predictions")
+    # X_test = features_test[feature_cols]
+    # X_test = scaler.transform(X_test)
+    # X_test = pca.transform(X_test)
 
-    predictions = final_model.predict(X_test)
+    # predictions = final_model.predict(X_test)
 
-    print("Writing predictions to predictions.json")
-    asin_test = pd.read_json("Toys_and_Games/test3/product_test.json")
-    asin_test.sort_index(axis=0, inplace=True)
-    # print(asin_test.head(10))
-    asin_test.insert(1, "awesomeness", predictions)
-    # print(asin_test.head(10))
-    asin_test.to_json("predictions.json")
+    # print("Writing predictions to predictions.json")
+    # asin_test = pd.read_json("Toys_and_Games/test3/product_test.json")
+    # asin_test.sort_index(axis=0, inplace=True)
+    # # print(asin_test.head(10))
+    # asin_test.insert(1, "awesomeness", predictions)
+    # # print(asin_test.head(10))
+    # asin_test.to_json("predictions.json")
 
 
 if __name__ == '__main__':

@@ -9,12 +9,17 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 def nlp(review_list):
     analyzer = SentimentIntensityAnalyzer()
     compounds = []
+    positivity = []
+    negativity = []
     for review in review_list:
         if review is None:
             compounds.append(None)
         else:
             compounds.append(analyzer.polarity_scores(review)["compound"])
-    return compounds
+            positivity.append(analyzer.polarity_scores(review)["pos"])
+            negativity.append(analyzer.polarity_scores(review)["neg"])
+
+    return compounds, positivity, negativity
 
 
 def get_age_weight(rev_training, index, first_rev_time):
@@ -62,13 +67,28 @@ def get_std_compound(compound_list):
         return round(np.std(comp_list), 4)
     return 0
 
+def get_pct_pos(compound_list):
+    pos = 0
+    comp_list = np.array(compound_list)
+    comp_list = comp_list[comp_list != None]
+    #print(comp_list.shape[0])
+    len = comp_list.shape[0]
+    if len == 0:
+        return 0.5
+    for i in range(len):
+        if comp_list[i] > 0: # tweak this parameter
+            pos += 1
+    return round(pos / len, 3)
+
+
 ### Preprocessing ###
 
-def preprocess(associations, prod_training, rev_training):
+def preprocess(associations, rev_training):
     # index texts, summary, get avg star rating
     product_text_list = []
     product_summ_list = []
     feature_stars_list = []
+    feature_stars4_list = []
     for asin in associations.keys():
         text_list = []
         summ_list = []
@@ -89,16 +109,38 @@ def preprocess(associations, prod_training, rev_training):
                 summ_list.append(rev_training.summary[index])
         product_text_list.append(text_list)
         product_summ_list.append(summ_list)
-        feature_stars_list.append(round(np.mean(stars_list), 1) if stars_list != [] else 3) # change to avg 3 stars if no rating
+        feature_stars_list.append(round(np.mean(stars_list), 1) if stars_list != [] else 3) # changed to avg 3 stars if no rating
+        feature_stars4_list.append(1 if feature_stars_list[-1] >= 4 else 0)
 
     # NLP
     product_compound_text_list = []
     product_compound_summ_list = []
+    product_pos_text_list = []
+    product_pos_summ_list = []
+    product_neg_text_list = []
+    product_neg_summ_list = []
     for i in range(len(associations)):
         if i % 5000 == 0:
             print('NLP: {} of {}'.format(i, len(associations)))
-        product_compound_text_list.append(nlp(product_text_list[i]))
-        product_compound_summ_list.append(nlp(product_summ_list[i]))
+        compound_text, pos_text, neg_text = nlp(product_text_list[i])
+        product_compound_text_list.append(compound_text)
+        product_pos_text_list.append(pos_text)
+        product_neg_text_list.append(neg_text)
+        compound_summ, pos_summ, neg_summ = nlp(product_summ_list[i])
+        product_compound_summ_list.append(compound_summ)
+        product_pos_summ_list.append(pos_summ)
+        product_neg_summ_list.append(neg_summ)
+    
+    feature_avg_pos_text_list = []
+    feature_avg_pos_summ_list = []
+    feature_avg_neg_text_list = []
+    feature_avg_neg_summ_list = []
+    for i in range(len(associations)):
+        feature_avg_pos_text_list.append(round(np.mean(product_pos_text_list[i]), 2))
+        feature_avg_pos_summ_list.append(round(np.mean(product_pos_summ_list[i]), 2) if product_pos_summ_list[i] != [] else 0.5)
+        feature_avg_neg_text_list.append(round(np.mean(product_neg_text_list[i]), 2))
+        feature_avg_neg_summ_list.append(round(np.mean(product_neg_summ_list[i]), 2) if product_neg_summ_list[i] != [] else 0) # change back to 0.5 ?
+
 
     #  Age, Vote, Verification, Image weight, Amount of Reviews, Verification Percentage
     print("Compute remaining features")
@@ -108,6 +150,7 @@ def preprocess(associations, prod_training, rev_training):
     product_image_weight = []
     feature_num_rev_list = []
     feature_verification_perc_list = []
+    feature_product_age_list = []
     for asin in associations.keys():
         min_age = float("inf")
         age_weight = []
@@ -124,6 +167,8 @@ def preprocess(associations, prod_training, rev_training):
                 min_age = age
             if vote > max_votes:
                 max_votes = vote
+        
+        feature_product_age_list.append((1684923095 - min_age)/(365 * 24 * 3600)) # age in years from 05/2023 backwards
 
         for index in associations[asin]:
             age_weight.append(get_age_weight(rev_training, index, min_age))
@@ -143,6 +188,11 @@ def preprocess(associations, prod_training, rev_training):
     feature_avg_compound_summ_list = []
     feature_std_text_list = []
     feature_std_summ_list = []
+    feature_avg_weight_pos_text_list = []
+    feature_avg_weight_pos_summ_list = []
+    feature_avg_weight_neg_text_list = []
+    feature_avg_weight_neg_summ_list = []
+    feature_pct_pos_list = []
     for i in range(len(associations)):
         product_weights = [product_age_weight[i], product_vote_weight[i], product_verification_weight[i],
                            product_image_weight[i]]
@@ -150,16 +200,32 @@ def preprocess(associations, prod_training, rev_training):
             get_avg_weight_compound(product_compound_text_list[i], product_weights))
         feature_avg_compound_summ_list.append(
             get_avg_weight_compound(product_compound_summ_list[i], product_weights))
+        feature_avg_weight_pos_text_list.append(get_avg_weight_compound(product_pos_text_list[i], product_weights))
+        feature_avg_weight_pos_summ_list.append(get_avg_weight_compound(product_pos_summ_list[i], product_weights))
+        feature_avg_weight_neg_text_list.append(get_avg_weight_compound(product_neg_text_list[i], product_weights))
+        feature_avg_weight_neg_summ_list.append(get_avg_weight_compound(product_neg_summ_list[i], product_weights))
         feature_std_text_list.append(get_std_compound(product_compound_text_list[i]))
         feature_std_summ_list.append(get_std_compound(product_compound_summ_list[i]))
+        feature_pct_pos_list.append(get_pct_pos(product_compound_text_list[i]))
 
     features = {"avg_compound_text": feature_avg_compound_text_list,
                 "avg_compound_summ": feature_avg_compound_summ_list,
+                "pos_text": feature_avg_pos_text_list,
+                "avg_pos_text": feature_avg_weight_pos_text_list,
+                "pos_summ": feature_avg_pos_summ_list,
+                "avg_pos_summ": feature_avg_weight_pos_summ_list,
+                "neg_text": feature_avg_neg_text_list,
+                "avg_neg_text": feature_avg_weight_neg_text_list,
+                "neg_summ": feature_avg_neg_summ_list,
+                "avg_neg_summ": feature_avg_weight_neg_summ_list,
                 "std_text": feature_std_text_list,
                 "std_summ": feature_std_summ_list,
                 "pct_verif": feature_verification_perc_list,
                 "amt_reviews": feature_num_rev_list,
-                "amt_stars": feature_stars_list}
+                "amt_stars": feature_stars_list,
+                "pct_pos": feature_pct_pos_list,
+                "starsabove4": feature_stars4_list,
+                "product_age": feature_product_age_list}
 
     return features
 
@@ -179,17 +245,14 @@ def generate_feature_vectors():
     reviews_training = pd.read_json("Toys_and_Games/train/review_training.json")
     awesomeness_training = pd.read_json("Toys_and_Games/train/product_training.json")
     reviews_test = pd.read_json("Toys_and_Games/test3/review_test.json")
-    asin_test = pd.read_json("Toys_and_Games/test3/product_test.json")
 
-    print("Running associations on training")
+    # reviews_training = reviews_training.head(1000)
+
     associations_training = reviews_training.groupby('asin').apply(lambda x: x.index.tolist())
-
-    print("Running associations on test")
     associations_test = reviews_test.groupby('asin').apply(lambda x: x.index.tolist())
     
-    #Preprocessing may run up to 30min (recent Mac M2 Pro)
     print("Preprocessing training")
-    features_training = preprocess(associations_training, awesomeness_training, reviews_training)
+    features_training = preprocess(associations_training, reviews_training)
     print("Adding ground truth")
     awesomeness = add_awesomeness(associations_training, features_training, awesomeness_training)
     
@@ -197,7 +260,7 @@ def generate_feature_vectors():
     df_training.to_json("./features/features_training.json")
     
     print("Preprocessing test")
-    features_test = preprocess(associations_test, asin_test, reviews_test)
+    features_test = preprocess(associations_test, reviews_test)
 
     df_test = pd.DataFrame(features_test, index=list(associations_test.keys()))
     df_test.to_json("./features/features_test3.json")
