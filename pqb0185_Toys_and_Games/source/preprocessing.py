@@ -251,13 +251,13 @@ def generate_feature_vectors():
     associations_training = reviews_training.groupby('asin').apply(lambda x: x.index.tolist())
     associations_test = reviews_test.groupby('asin').apply(lambda x: x.index.tolist())
     
-    print("Preprocessing training")
-    features_training = preprocess(associations_training, reviews_training)
-    print("Adding ground truth")
-    awesomeness = add_awesomeness(associations_training, features_training, awesomeness_training)
+    # print("Preprocessing training")
+    # features_training = preprocess(associations_training, reviews_training)
+    # print("Adding ground truth")
+    # awesomeness = add_awesomeness(associations_training, features_training, awesomeness_training)
     
-    df_training = pd.DataFrame(awesomeness, index=list(associations_training.keys()))
-    df_training.to_json("./features/features_training.json")
+    # df_training = pd.DataFrame(awesomeness, index=list(associations_training.keys()))
+    # df_training.to_json("./features/features_training.json")
     
     print("Preprocessing test")
     features_test = preprocess(associations_test, reviews_test)

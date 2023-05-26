@@ -86,18 +86,30 @@ def evolutionary_search(X, Y):
     print("Performing Evolutionary Search")
     model_nn = MLPClassifier(max_iter=2000)
 
+    # nn_params = {'tol': Continuous(1e-4, 1e-1, distribution='log-uniform'),
+    #         'hidden_layer_sizes': Categorical([ (100, 100), (10, 10, 10), (100, 100, 100), (10, 10, 10, 10), (100, 100, 100, 100)]),
+    #         'alpha': Continuous(1e-5, 3e-5),
+    #         'activation': Categorical(['relu', 'tanh', 'logistic']),
+    #         'solver': Categorical(['adam', 'sgd']),
+    #         'learning_rate': Categorical(['constant', 'adaptive']),
+    #         'learning_rate_init': Continuous(1e-3, 1e-1),
+    #         'shuffle': Categorical([True, False])
+    #         # beta_1, beta_2,...
+    #         }
+
     nn_params = {'tol': Continuous(1e-4, 1e-1, distribution='log-uniform'),
-            'hidden_layer_sizes': Categorical([ (100, 100), (10, 10, 10), (100, 100, 100), (10, 10, 10, 10), (100, 100, 100, 100)]),
-            'alpha': Continuous(1e-5, 3e-5),
-            'activation': Categorical(['relu', 'tanh', 'logistic']),
-            'solver': Categorical(['adam', 'sgd']),
-            'learning_rate': Categorical(['constant', 'adaptive']),
-            'learning_rate_init': Continuous(1e-3, 1e-1),
-            'shuffle': Categorical([True, False])
-            #batch_size, beta_1, beta_2,...
-            }
+        'hidden_layer_sizes': Categorical([(60, 60, 60), (80, 80, 80), (100, 100, 100)]),
+        'alpha': Continuous(1e-5, 3e-5),
+        'activation': Categorical(['relu', 'tanh', 'logistic']),
+        'solver': Categorical(['adam']),
+        'learning_rate': Categorical(['adaptive']),
+        'learning_rate_init': Continuous(1e-3, 1e-1),
+        'shuffle': Categorical([True, False]),
+        'beta_1': Continuous(0.1, 0.999, distribution='uniform'),
+        'beta_2': Continuous(0.1, 0.999, distribution='uniform')
+        }
     
-    nn_grid = GASearchCV(estimator=model_nn, param_grid=nn_params, cv=10, scoring="f1", verbose=True, n_jobs=-1, population_size=20, generations=20)
+    nn_grid = GASearchCV(estimator=model_nn, param_grid=nn_params, cv=10, scoring="f1", verbose=True, n_jobs=-1, population_size=20, generations=30)
     nn_grid.fit(X, Y)
     nn_best_params = nn_grid.best_params_
     print("Evolutionary Search Neural Network best parameters: ", nn_best_params)
@@ -125,7 +137,7 @@ def main():
     X = scaler.transform(X)
     
     # PCA
-    pca = PCA(n_components=12) # usually: improved model performance at cost of accuracy
+    pca = PCA(n_components=16) # usually: improved model performance at cost of accuracy
     X = pca.fit_transform(X)
 
     # Perform Hyperparameter Optimization
@@ -134,12 +146,18 @@ def main():
 
     # nn_best_params = {'activation': 'tanh', 'hidden_layer_sizes': (10, 10, 10, 10), 'learning_rate': 'constant', 'learning_rate_init': 0.05, 'solver': 'sgd'}
     # nn_best_params = {'tol': 0.008330546988037554, 'hidden_layer_sizes': (100, 100, 100, 100), 'alpha': 1.176332001397507e-05, 'activation': 'relu', 'solver': 'sgd', 'learning_rate': 'constant', 'learning_rate_init': 0.1187653569983233, 'shuffle': True}
-    
+    # Best params with new features & PCA
+    # nn_best_params = {'tol': 0.002752746173355706, 'hidden_ layer_sizes": (100, 100, 100), 'alpha': 1.8352930640201793-05, 'activation': 'logistic', 'solver': 'adam', 'learning_rate': 'adaptive', 'learning_rate_init': 0.02053309630612782, 'shuffle': True}
+    # PCA 14 Features
+    # {'tol': 0.0019322847553616797, 'hidden_layer_sizes': (100, 100, 100), 'alpha': 1.8805851530106525e-05, 'activation': 'relu', 'solver': 'adam', 'learning_rate': 'adaptive', 'learning_rate_init': 0.005438216040729737, 'shuffle': True, 'beta_1': 0.24733399460852953, 'beta_2': 0.7711747027634991}
+    # PCA 16 Features
+    {'tol': 0.0047053509444650735, 'hidden_layer_sizes': (100, 100, 100), 'alpha': 2.293117525394365e-05, 'activation': 'logistic', 'solver': 'adam', 'learning_rate': 'adaptive', 'learning_rate_init': 0.05087871479564992, 'shuffle': True, 'beta_1': 0.7782182029664358, 'beta_2': 0.9689008434130593}
+
     ### Boosting ###
     model_ab = AdaBoostClassifier(
         RandomForestClassifier(max_depth=5, n_estimators=100, n_jobs=-1, criterion="log_loss", class_weight=None),
         n_estimators=13, learning_rate=2.075)
-    model_nn = MLPClassifier(**nn_best_params)
+    model_nn = MLPClassifier(**nn_best_params, max_iter=2000)
 
     models = [value for name, value in locals().items() if name.startswith('model_')]
     model_names = [name for name, value in locals().items() if name.startswith('model_')]
