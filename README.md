@@ -13,4 +13,4 @@ Download Dataset and copy folder Toys_and_Games/ into source/ to be able to read
 
 Python Version used: ```Python 3.9.6```
 
-Running ```main.py``` reads feature vectors and trains vectors generated from ```train3``` on a pre-trained ???.
+Running ```main.py``` reads feature vectors and trains vectors generated from ```train3``` on a pre-trained multi-layer perceptron.
