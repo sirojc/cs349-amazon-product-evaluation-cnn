@@ -1,4 +1,4 @@
-,model_nn
-f1,0.7589
-precision,0.723
-recall,0.8007
+,model_ab_old
+f1,0.7698
+precision,0.6795
+recall,0.8878
