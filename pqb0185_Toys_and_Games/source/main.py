@@ -107,6 +107,27 @@ def evolutionary_search(X, Y):
 
     return nn_best_params, ab_best_params, rf_best_params
 
+def grid_search(X, Y):
+    print("Defining models for grid search")
+    model_ab = AdaBoostClassifier(
+        RandomForestClassifier(max_depth=8, n_estimators=100, n_jobs=-1, criterion="log_loss", class_weight=None))
+
+    ab_params = {'n_estimators': [12, 13, 14],
+                'estimator__max_depth': [4, 5],
+                'learning_rate': [2.05, 2.0725, 2.075, 2.07752, 2.08],
+                'estimator__max_features': ['sqrt', 'log2'],
+                'estimator__min_samples_split': [2, 5],
+                }
+
+    ab_grid = GridSearchCV(model_ab, ab_params, cv=10, scoring="f1", verbose=2, n_jobs=-1)
+
+    ab_grid.fit(X, Y)
+
+    ab_best_params = ab_grid.best_params_
+
+    print("AdaBoost best parameters: ", ab_best_params)
+
+    return ab_best_params
 
 ### Main ###
 
@@ -136,6 +157,7 @@ def main():
     # Perform Hyperparameter Optimization
     # nn_best_params = evolutionary_search(X, Y)[0]
     # ab_best_params = evolutionary_search(X, Y)[1]
+    # ab_old_opt_best_params = grid_search(X, Y)
     # rf_best_params = evolutionary_search(X, Y)[2]
 
     # 20 gen, max 100 nodes
@@ -153,14 +175,17 @@ def main():
     
     # rf_best_params = {'max_depth': 12, 'n_estimators': 17, 'criterion': 'log_loss', 'class_weight': None, 'max_features': 'log2', 'min_samples_split': 7, 'min_samples_leaf': 8, 'bootstrap': True}
 
-    # # model_ab_old = AdaBoostClassifier(
-    # #     RandomForestClassifier(max_depth=5, n_estimators=100, n_jobs=-1, criterion="log_loss", class_weight=None),
-    # #     n_estimators=13, learning_rate=2.075)
+    # model_ab_old = AdaBoostClassifier(
+    #     RandomForestClassifier(max_depth=5, n_estimators=100, n_jobs=-1, criterion="log_loss", class_weight=None),
+    #     n_estimators=13, learning_rate=2.075)
+
+    # model_ab_old_opt = AdaBoostClassifier(RandomForestClassifier(max_depth=5, n_estimators=100, n_jobs=-1, criterion="log_loss", class_weight=None),
+    #     n_estimators=13, learning_rate=2.0725)
     
-    # model_nn1 = MLPClassifier(**nn_best_params1, max_iter=2000)
-    # model_nn2 = MLPClassifier(**nn_best_params2, max_iter=2000)
-    # model_ab = AdaBoostClassifier(RandomForestClassifier(**ab_rf_best_params), **ab_best_params)
-    # model_rf = RandomForestClassifier(**rf_best_params)
+    # # model_nn1 = MLPClassifier(**nn_best_params1, max_iter=2000)
+    # # model_nn2 = MLPClassifier(**nn_best_params2, max_iter=2000)
+    # # model_ab = AdaBoostClassifier(RandomForestClassifier(**ab_rf_best_params), **ab_best_params)
+    # # model_rf = RandomForestClassifier(**rf_best_params)
 
     # models = [value for name, value in locals().items() if name.startswith('model_')]
     # model_names = [name for name, value in locals().items() if name.startswith('model_')]
@@ -196,26 +221,27 @@ def main():
     # model_nn1 = pickle.load(open("./models/model_nn1.pkl", "rb"))
     # model_nn2 = pickle.load(open("./models/model_nn2.pkl", "rb"))
     # model_rf = pickle.load(open("./models/model_rf.pkl", "rb"))
-    model_ab_old = pickle.load(open("./models/model_ab_old.pkl", "rb"))
+    model_ab_old = pickle.load(open("./models/model_ab_old_opt.pkl", "rb"))
+    model_ab_old_opt = pickle.load(open("./models/model_ab_old_opt.pkl", "rb"))
 
-    final_model = model_ab_old
+    final_model = model_ab_old_opt
 
     ### Predictions ###
     print("Running predictions")
-    # X_test1 = features_test1[feature_cols]
-    # X_test1 = scaler.transform(X_test1)
-    # X_test1 = pca.transform(X_test1)
+    X_test1 = features_test1[feature_cols]
+    X_test1 = scaler.transform(X_test1)
+    X_test1 = pca.transform(X_test1)
 
-    # X_test2 = features_test2[feature_cols]
-    # X_test2 = scaler.transform(X_test2)
-    # X_test2 = pca.transform(X_test2)
+    X_test2 = features_test2[feature_cols]
+    X_test2 = scaler.transform(X_test2)
+    X_test2 = pca.transform(X_test2)
 
     X_test3 = features_test3[feature_cols]
     X_test3 = scaler.transform(X_test3)
     X_test3 = pca.transform(X_test3)
 
-    # predictions1 = final_model.predict(X_test1)
-    # predictions2 = final_model.predict(X_test2)
+    predictions1 = final_model.predict(X_test1)
+    predictions2 = final_model.predict(X_test2)
     predictions3 = final_model.predict(X_test3)
 
     print("Writing predictions to predictions on test3.json")
@@ -224,17 +250,17 @@ def main():
     asin_test.insert(1, "awesomeness", predictions3)
     asin_test.to_json("predictions.json")
 
-    # print("Writing predictions to predictions on test2.json")
-    # asin_test = pd.read_json("Toys_and_Games/test2/product_test.json")
-    # asin_test.sort_index(axis=0, inplace=True)
-    # asin_test.insert(1, "awesomeness", predictions2)
-    # asin_test.to_json("predictions_test2.json")
+    print("Writing predictions to predictions on test2.json")
+    asin_test = pd.read_json("Toys_and_Games/test2/product_test.json")
+    asin_test.sort_index(axis=0, inplace=True)
+    asin_test.insert(1, "awesomeness", predictions2)
+    asin_test.to_json("predictions_test2.json")
 
-    # print("Writing predictions to predictions on test1.json")
-    # asin_test = pd.read_json("Toys_and_Games/test1/product_test.json")
-    # asin_test.sort_index(axis=0, inplace=True)
-    # asin_test.insert(1, "awesomeness", predictions1)
-    # asin_test.to_json("predictions_test1.json")
+    print("Writing predictions to predictions on test1.json")
+    asin_test = pd.read_json("Toys_and_Games/test1/product_test.json")
+    asin_test.sort_index(axis=0, inplace=True)
+    asin_test.insert(1, "awesomeness", predictions1)
+    asin_test.to_json("predictions_test1.json")
 
 
 if __name__ == '__main__':
